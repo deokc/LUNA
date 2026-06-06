@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LUNA DIVISION</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            /* 전체 배경을 어둡게 설정 */
+            --bg: #0d0d0d; /* 검은색 */
+            --ink: #f5f3ef; /* 밝은 아이보리색 */
+            --ink-light: rgba(245, 243, 239, 0.7); /* 반투명 밝은색 */
+            --ink-ghost: #444444; /* 어두운 회색 */
+            --neon: #ff1a6e;
+            --neon-dim: rgba(255, 26, 110, 0.12);
+            --card-bg: #111111; /* 어두운 카드 배경 */
+            --line: rgba(245, 243, 239, 0.1); /* 밝은 선 */
+            --font-display: 'Cormorant Garamond', serif;
+            --font-mono: 'DM Mono', monospace;
+            --font-body: 'Noto Sans KR', sans-serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            background: var(--bg);
+            color: var(--ink);
+            font-family: var(--font-body);
+            overflow-x: hidden;
+            cursor: none;
+            position: relative; /* 비 효과 canvas를 위해 필요 */
+        }
+
+        /* ── Noise Overlay ── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 9000;
+        }
+
+        /* ── Rain Effect Canvas ── */
+        #rainCanvas {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: -1; /* 최하단 배치 */
+        }
+
+        /* ── Custom Cursor ── */
+        .cursor-dot {
+            width: 8px; height: 8px;
+            background: var(--neon);
+            border-radius: 50%;
+            position: fixed; pointer-events: none;
+            z-index: 100002; /* 인트로 레이어보다 위에 오도록 수정 */
+            transform: translate(-50%, -50%);
+            transition: transform 0.1s ease;
+        }
+        .cursor-ring {
+            width: 36px; height: 36px;
+            border: 1px solid var(--ink);
+            border-radius: 50%;
+            position: fixed; pointer-events: none;
+            z-index: 100001; /* 인트로 레이어보다 위에 오도록 수정 */
+            transform: translate(-50%, -50%);
+            transition: all 0.15s ease;
+        }
+        .cursor-ring.expanded {
+            width: 60px; height: 60px;
+            border-color: var(--neon);
+            background: rgba(255,26,110,0.05);
+        }
+
+        /* ── Navigation ── */
+        nav {
+            position: fixed; top: 0; left: 0; right: 0;
+            z-index: 1000;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 5vw;
+            height: 72px;
+            background: rgba(13,13,13,0.88); /* 어두운 배경 */
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--line);
+        }
+
+        .nav-logo {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--ink);
+        }
+
+        .nav-logo span { color: var(--neon); }
+
+        .nav-links { display: flex; gap: 40px; }
+        .nav-links a {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--ink-light);
+            text-decoration: none;
+            transition: color 0.2s;
+            position: relative;
+        }
+        .nav-links a::after {
+            content: '';
+            position: absolute; bottom: -4px; left: 0;
+            width: 0; height: 1px;
+            background: var(--neon);
+            transition: width 0.25s ease;
+        }
+        .nav-links a:hover { color: var(--ink); }
+        .nav-links a:hover::after { width: 100%; }
+
+        /* ── Music Player ── */
+        #music-player {
+            position: fixed; bottom: 40px; left: 5vw;
+            z-index: 1000;
+            display: flex; align-items: center; gap: 16px;
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            letter-spacing: 0.1em;
+            color: var(--ink-light);
+        }
+
+        #play-btn {
+            width: 40px; height: 40px;
+            border: 1px solid var(--ink);
+            background: transparent;
+            cursor: none;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.7rem;
+            color: var(--ink);
+            transition: all 0.2s;
+            border-radius: 50%;
+        }
+        #play-btn:hover, #play-btn.playing {
+            background: var(--neon);
+            border-color: var(--neon);
+            color: white;
+        }
+
+        .music-track { text-transform: uppercase; }
+
+        .volume-control {
+            display: flex; align-items: center; gap: 8px;
+        }
+        #volume-slider {
+            -webkit-appearance: none;
+            width: 60px; height: 1px;
+            background: var(--ink-ghost);
+            outline: none; cursor: none;
+        }
+        #volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px; height: 10px;
+            background: var(--neon);
+            border-radius: 50%;
+            cursor: none;
+        }
+
+        /* ── Hero ── */
+        #hero {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            align-items: stretch;
+            padding-top: 72px;
+            position: relative; /* 비 효과 canvas를 위해 필요 */
+        }
+
+        .hero-left {
+            display: flex; flex-direction: column;
+            justify-content: center;
+            padding: 80px 6vw 80px 5vw;
+            border-right: 1px solid var(--line);
+        }
+
+        .hero-issue {
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            letter-spacing: 0.25em;
+            color: var(--neon);
+            text-transform: uppercase;
+            margin-bottom: 32px;
+        }
+
+        .hero-title {
+            font-family: var(--font-display);
+            font-size: clamp(5rem, 9vw, 10rem);
+            font-weight: 300;
+            line-height: 0.88;
+            letter-spacing: -0.02em;
+            margin-bottom: 40px;
+        }
+
+        .hero-title em {
+            font-style: italic;
+            color: var(--neon);
+        }
+
+        .hero-sub {
+            font-family: var(--font-display);
+            font-size: 1.15rem;
+            font-weight: 300;
+            font-style: italic;
+            color: var(--ink-light);
+            line-height: 1.7;
+            max-width: 380px;
+            border-left: 2px solid var(--neon);
+            padding-left: 20px;
+        }
+
+        .hero-right {
+            position: relative;
+            overflow: hidden;
+            display: grid;
+            grid-template-rows: 1fr auto;
+        }
+
+        .hero-img-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            height: 100%;
+        }
+
+        .hero-img-cell {
+            overflow: hidden;
+            border-right: 1px solid var(--line);
+            border-bottom: 1px solid var(--line);
+        }
+        .hero-img-cell:nth-child(even) { border-right: none; }
+
+        .hero-img-cell img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            filter: grayscale(40%) contrast(1.05);
+            transition: filter 0.4s ease, transform 0.6s ease;
+            display: block;
+        }
+        .hero-img-cell:hover img {
+            filter: grayscale(0%) contrast(1.1);
+            transform: scale(1.04);
+        }
+
+        .hero-caption {
+            padding: 16px 24px;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.12em;
+            color: var(--ink-light);
+            border-top: 1px solid var(--line);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* ── Section Common ── */
+        section { padding: 120px 5vw; }
+
+        .section-header {
+            display: flex;
+            align-items: baseline;
+            gap: 24px;
+            margin-bottom: 72px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .section-label {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.25em;
+            color: var(--neon);
+            text-transform: uppercase;
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: clamp(2.2rem, 4vw, 3.5rem);
+            font-weight: 300;
+            letter-spacing: -0.01em;
+        }
+
+        .section-number {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            color: var(--ink-ghost);
+            margin-left: auto;
+        }
+
+        /* ── World Section ── */
+        .world-layout {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 60px;
+            align-items: start;
+        }
+
+        .world-img-wrap {
+            position: relative;
+            overflow: hidden;
+        }
+        .world-img-wrap img {
+            width: 100%; display: block;
+            filter: grayscale(20%) contrast(1.1);
+            transition: opacity 0.3s ease;
+        }
+        .world-img-label {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            padding: 20px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.15em;
+            color: rgba(255,255,255,0.7);
+            text-transform: uppercase;
+            z-index: 2;
+        }
+
+        /* 월드 뷰 썸네일 스타일 */
+        .world-thumb-container {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            flex-wrap: wrap; /* 11개 썸네일이 레이아웃을 깨뜨리지 않고 자연스럽게 줄바꿈되도록 변경 */
+        }
+        .world-thumb {
+            width: 80px;
+            height: 54px;
+            border: 1px solid rgba(245, 243, 239, 0.15);
+            background: #111;
+            overflow: hidden;
+            transition: all 0.25s ease;
+            opacity: 0.4;
+        }
+        .world-thumb img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .world-thumb:hover {
+            opacity: 0.8;
+            transform: translateY(-2px);
+        }
+        .world-thumb.active {
+            opacity: 1;
+            border-color: var(--neon);
+            box-shadow: 0 0 10px var(--neon-dim);
+        }
+
+        .world-text .prologue-body {
+            font-family: var(--font-body);
+            font-size: 1rem;
+            font-weight: 300;
+            line-height: 2;
+            color: var(--ink-light); /* 반투명 밝은색 사용 */
+            margin-bottom: 48px;
+        }
+
+        .keyword-list { display: flex; flex-direction: column; gap: 1px; }
+
+        .keyword-item {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0;
+            border-top: 1px solid #333;
+            overflow: hidden;
+        }
+        .keyword-item:last-child { border-bottom: 1px solid #333; }
+
+        .keyword-tag {
+            font-family: var(--font-mono);
+            font-size: 0.62rem;
+            letter-spacing: 0.12em;
+            color: var(--neon);
+            text-transform: uppercase;
+            padding: 18px 20px;
+            border-right: 1px solid #333;
+            writing-mode: vertical-lr;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+            white-space: nowrap;
+        }
+
+        .keyword-body {
+            padding: 18px 24px;
+        }
+        .keyword-body h4 {
+            font-family: var(--font-display);
+            font-size: 1.05rem;
+            font-weight: 400;
+            margin-bottom: 6px;
+            color: var(--ink); /* 밝은색 사용 */
+        }
+        .keyword-body p {
+            font-size: 0.82rem;
+            line-height: 1.65;
+            color: #888;
+            font-weight: 300;
+        }
+
+        /* ── Characters ── */
+        #characters { background: var(--bg); }
+
+        .char-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2px;
+        }
+
+        .char-card {
+            position: relative;
+            overflow: hidden;
+            cursor: none;
+            aspect-ratio: 3/4;
+            background: #111;
+        }
+
+        .char-card img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            display: block;
+            filter: grayscale(60%) contrast(1.1);
+            transition: filter 0.5s ease, transform 0.7s cubic-bezier(.22,.68,0,1.2);
+        }
+
+        .char-card:hover img {
+            filter: grayscale(0%) contrast(1.05);
+            transform: scale(1.06);
+        }
+
+        .char-overlay {
+            position: absolute; inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 55%);
+            display: flex; flex-direction: column;
+            justify-content: flex-end;
+            padding: 28px;
+            transition: all 0.3s ease;
+        }
+
+        .char-code {
+            font-family: var(--font-mono);
+            font-size: 0.62rem;
+            letter-spacing: 0.2em;
+            color: var(--neon);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .char-name {
+            font-family: var(--font-display);
+            font-size: 1.8rem;
+            font-weight: 300;
+            color: white;
+            line-height: 1.1;
+            margin-bottom: 8px;
+        }
+
+        .char-role {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.5);
+            font-weight: 300;
+        }
+
+        .char-hover-bar {
+            position: absolute;
+            bottom: 0; left: 0;
+            width: 0; height: 2px;
+            background: var(--neon);
+            transition: width 0.4s ease;
+        }
+        .char-card:hover .char-hover-bar { width: 100%; }
+
+        .char-view-btn {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 0.2em;
+            color: rgba(255,255,255,0);
+            text-transform: uppercase;
+            margin-top: 12px;
+            transition: color 0.3s;
+        }
+        .char-card:hover .char-view-btn { color: rgba(255,255,255,0.7); }
+
+        /* ── Test Section ── */
+        .test-layout {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 60px;
+            align-items: start;
+        }
+
+        .test-aside {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            font-style: italic;
+            color: #555;
+            line-height: 1.8;
+            padding-top: 12px;
+        }
+
+        .test-aside strong {
+            display: block;
+            font-family: var(--font-mono);
+            font-style: normal;
+            font-size: 0.65rem;
+            letter-spacing: 0.2em;
+            color: var(--neon);
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .test-box {
+            border: 1px solid #333;
+            min-height: 420px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .test-progress {
+            padding: 20px 32px;
+            border-bottom: 1px solid #333;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.2em;
+            color: #444;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .progress-bar-wrap {
+            width: 80px; height: 1px;
+            background: #333;
+            align-self: center;
+            position: relative;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--neon);
+            transition: width 0.4s ease;
+        }
+
+        #question-display { padding: 40px 32px; }
+
+        .question-text {
+            font-family: var(--font-display);
+            font-size: 1.4rem;
+            font-weight: 300;
+            color: var(--ink); /* 밝은색 사용 */
+            line-height: 1.5;
+            margin-bottom: 36px;
+        }
+
+        .answer-list { display: flex; flex-direction: column; gap: 2px; }
+
+        .answer-btn {
+            background: transparent;
+            border: none;
+            border-top: 1px solid #222;
+            padding: 18px 0;
+            color: #666;
+            cursor: none;
+            text-align: left;
+            font-family: var(--font-body);
+            font-size: 0.88rem;
+            font-weight: 300;
+            line-height: 1.5;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .answer-btn::before {
+            content: '→';
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            color: #444;
+            transition: color 0.2s, transform 0.2s;
+            flex-shrink: 0;
+        }
+        .answer-btn:hover {
+            color: var(--ink); /* 밝은색 사용 */
+            padding-left: 8px;
+        }
+        .answer-btn:hover::before {
+            color: var(--neon);
+            transform: translateX(4px);
+        }
+        .answer-btn:last-child { border-bottom: 1px solid #222; }
+
+        #result-display {
+            padding: 48px 32px;
+            display: none;
+            animation: fadeUp 0.6s ease forwards;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-label {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.25em;
+            color: var(--neon);
+            text-transform: uppercase;
+            margin-bottom: 24px;
+        }
+
+        .result-code {
+            font-family: var(--font-display);
+            font-size: clamp(2.5rem, 5vw, 4.5rem);
+            font-weight: 300;
+            color: var(--ink); /* 밝은색 사용 */
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .result-code em { font-style: italic; color: var(--neon); }
+
+        .result-name {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.2em;
+            color: #555;
+            margin-bottom: 32px;
+        }
+
+        .result-desc {
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+            font-weight: 300;
+            color: #777;
+            line-height: 1.8;
+            max-width: 400px;
+            margin-bottom: 40px;
+        }
+
+        .retry-btn {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            background: transparent;
+            border: 1px solid #444;
+            color: #666;
+            padding: 14px 28px;
+            cursor: none;
+            transition: all 0.2s;
+        }
+        .retry-btn:hover {
+            border-color: var(--neon);
+            color: var(--neon);
+        }
+
+        /* ── Modal ── */
+        .modal {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(13,13,13,0.97);
+            z-index: 5000;
+            overflow-y: auto;
+        }
+
+        .modal-inner {
+            max-width: 1100px;
+            margin: 72px auto;
+            padding: 0 40px 80px;
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 80px;
+            align-items: start;
+        }
+
+        .modal-close {
+            position: fixed;
+            top: 28px; right: 5vw;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.25em;
+            color: #555;
+            cursor: none;
+            text-transform: uppercase;
+            transition: color 0.2s;
+            background: none; border: none;
+        }
+        .modal-close:hover { color: var(--neon); }
+
+        .modal-img-wrap {
+            position: sticky;
+            top: 100px;
+        }
+
+        .modal-img-frame {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .modal-img-frame img {
+            width: 100%; display: block;
+            filter: contrast(1.05);
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-form-btn {
+            width: 100%;
+            padding: 16px;
+            background: transparent;
+            border: 1px solid #333;
+            border-top: none;
+            color: #555;
+            font-family: var(--font-mono);
+            font-size: 0.62rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            cursor: none;
+            transition: all 0.2s;
+        }
+        .modal-form-btn:hover {
+            border-color: var(--neon);
+            color: var(--neon);
+            background: rgba(255,26,110,0.04);
+        }
+
+        .modal-info { padding-top: 12px; }
+
+        .modal-tag {
+            font-family: var(--font-mono);
+            font-size: 0.62rem;
+            letter-spacing: 0.2em;
+            color: var(--neon);
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .modal-name {
+            font-family: var(--font-display);
+            font-size: clamp(2.8rem, 4vw, 4rem);
+            font-weight: 300;
+            color: var(--ink); /* 밝은색 사용 */
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .modal-code {
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-style: italic;
+            color: #555;
+            margin-bottom: 32px;
+        }
+
+        .modal-divider { border: none; border-top: 1px solid #222; margin: 28px 0; }
+
+        .modal-meta {
+            display: flex; flex-direction: column; gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .modal-meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+
+        .modal-meta-key {
+            font-family: var(--font-mono);
+            font-size: 0.62rem;
+            letter-spacing: 0.15em;
+            color: #444;
+            text-transform: uppercase;
+        }
+
+        .modal-meta-val {
+            font-family: var(--font-body);
+            font-size: 0.85rem;
+            color: #888;
+            font-weight: 300;
+            text-align: right;
+            max-width: 65%;
+        }
+
+        .modal-quote {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-style: italic;
+            color: var(--ink); /* 밝은색 사용 */
+            line-height: 1.6;
+            padding: 28px 0;
+            border-top: 1px solid #222;
+            border-bottom: 1px solid #222;
+            margin-bottom: 28px;
+        }
+
+        .modal-quote::before { content: '"'; color: var(--neon); margin-right: 4px; }
+        .modal-quote::after { content: '"'; color: var(--neon); margin-left: 4px; }
+
+        .modal-desc {
+            font-size: 0.88rem;
+            line-height: 1.85;
+            color: #666;
+            font-weight: 300;
+        }
+
+        .modal-status {
+            margin-top: 40px;
+            padding: 20px;
+            border: 1px solid #1e1e1e;
+            background: #0d0d0d;
+        }
+
+        .modal-status-title {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 0.2em;
+            color: #333;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+        }
+
+        .status-bar { display: flex; flex-direction: column; gap: 10px; }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-label {
+            font-family: var(--font-mono);
+            font-size: 0.58rem;
+            color: #444;
+            width: 80px;
+            flex-shrink: 0;
+        }
+
+        .status-track {
+            flex: 1; height: 2px;
+            background: #1a1a1a;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .status-fill {
+            height: 100%;
+            background: var(--neon);
+            position: absolute; left: 0; top: 0;
+            transition: width 0.8s ease 0.3s;
+        }
+
+        /* ── Footer ── */
+        footer {
+            background: var(--bg); /* 어두운 배경색 사용 */
+            color: #333;
+            padding: 60px 5vw;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #1a1a1a;
+        }
+
+        .footer-logo {
+            font-family: var(--font-display);
+            font-size: 1.8rem;
+            font-weight: 300;
+            color: #2a2a2a;
+        }
+
+        .footer-copy {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 0.15em;
+            text-align: right;
+            line-height: 2;
+        }
+
+        /* ── Scroll reveal ── */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.7s ease, transform 0.7s ease;
+        }
+        .reveal.visible {
+            opacity: 1;
+            transform: none;
+        }
+
+        /* ── Intro Overlay ── */
+        #intro-overlay {
+            position: fixed; inset: 0;
+            background: #000000;
+            z-index: 100000;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            padding: 40px;
+            opacity: 1;
+            transition: opacity 1.2s ease;
+            cursor: none; /* 인트로 구간에서 기본 브라우저 마우스 숨김 */
+        }
+        .intro-text-wrap {
+            max-width: 650px;
+            text-align: center;
+            min-height: 140px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .intro-text {
+            font-family: var(--font-display);
+            font-size: clamp(1.2rem, 2.5vw, 1.65rem);
+            font-weight: 300;
+            line-height: 1.9;
+            color: var(--ink);
+            font-style: italic;
+            opacity: 0;
+            transform: translateY(15px);
+            filter: blur(4px); /* 흐릿하게 사라지는 효과를 위한 초기 필터값 추가 */
+            transition: opacity 0.5s ease, transform 0.5s ease, filter 0.5s ease; /* 필터 애니메이션 추가 */
+            word-break: keep-all;
+        }
+        .intro-text.active {
+            opacity: 1;
+            transform: translateY(0);
+            filter: blur(0); /* 활성화 시 선명하게 */
+        }
+        .intro-btn {
+            margin-top: 50px;
+            background: transparent;
+            border: 1px solid #333;
+            color: #666;
+            padding: 14px 32px;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.25em;
+            cursor: none;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+        .intro-btn:hover {
+            border-color: var(--neon);
+            color: var(--neon);
+            box-shadow: 0 0 10px var(--neon-dim);
+        }
+        body.intro-active {
+            overflow: hidden !important;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            #hero { grid-template-columns: 1fr; }
+            .hero-right { display: none; }
+            .world-layout { grid-template-columns: 1fr; }
+            .char-grid { grid-template-columns: repeat(2, 1fr); }
+            .test-layout { grid-template-columns: 1fr; }
+            .modal-inner { grid-template-columns: 1fr; padding: 0 20px 60px; }
+            .modal-img-wrap { position: static; }
+        }
+        @media (max-width: 600px) {
+            .char-grid { grid-template-columns: 1fr; }
+            nav { padding: 0 20px; }
+            .nav-links { gap: 20px; }
+            .hero-title { font-size: 3.5rem; }
+        }
+    </style>
+</head>
+<body class="intro-active">
+
+<div id="intro-overlay">
+    <div class="intro-text-wrap">
+        <div id="intro-text" class="intro-text"></div>
+    </div>
+    <button id="intro-btn" class="intro-btn" onclick="nextIntro()">Next →</button>
+</div>
+
+<div class="cursor-dot" id="cursorDot"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<canvas id="rainCanvas"></canvas>
+
+<nav>
+    <div class="nav-logo">LUNA <span>DIV</span>ISION</div>
+    <div class="nav-links">
+        <a href="#world">World</a>
+        <a href="#characters">Cast</a>
+        <a href="#test">Test</a>
+    </div>
+</nav>
+
+<div id="music-player">
+    <button id="play-btn" onclick="toggleMusic()">▶</button>
+    <div class="music-track">GLASS HEART PROTOCOL</div>
+    <div class="volume-control">
+        <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5" oninput="changeVolume(this.value)">
+    </div>
+    <audio id="bgm-audio" loop>
+        <source src="https://raw.githubusercontent.com/deokc/RUNA_pl/main/GLASS%20HEART%20PROTOCOL_01.mp3" type="audio/mpeg">
+    </audio>
+</div>
+
+<section id="hero">
+    <div class="hero-left">
+        <div class="hero-issue">Issue 001 — Luna Division Archives</div>
+        <h1 class="hero-title">LUNA<br><em>DIVI</em><br>SION</h1>
+        <p class="hero-sub">"당신의 절망이 밤의 괴물이 될 때,<br>누군가는 인생을 깎아 변신한다."</p>
+    </div>
+    <div class="hero-right">
+        <div class="hero-img-grid">
+            <div class="hero-img-cell">
+                <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/m01.png" alt="서은채">
+            </div>
+            <div class="hero-img-cell">
+                <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/m02.png" alt="사토 유키">
+            </div>
+            <div class="hero-img-cell">
+                <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/m03.png" alt="강민지">
+            </div>
+            <div class="hero-img-cell">
+                <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/m04.png" alt="이도윤">
+            </div>
+        </div>
+        <div class="hero-caption">
+            <span>감정 공명자 프로파일</span>
+            <span>2026</span>
+        </div>
+    </div>
+</section>
+
+<section id="world">
+    <div class="section-header reveal">
+        <div class="section-label">World View</div>
+        <h2 class="section-title">Lumina City</h2>
+        <div class="section-number">01 /</div>
+    </div>
+    <div class="world-layout">
+        <div>
+            <div class="world-img-wrap reveal">
+                <img id="worldMainImg" src="https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%EB%8F%84%EC%8B%9C.png" alt="루미나 시태">
+                <div class="world-img-label" id="worldImgLabel">루미나시티 도시 전경</div>
+            </div>
+            <div class="world-thumb-container reveal">
+                <div class="world-thumb active" onclick="changeWorldImage('https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%EB%8F%84%EC%8B%9C.png', '루미나시티 도시 전경', this)">
+                    <img src="https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%EB%8F%84%EC%8B%9C.png" alt="도시 전경">
+                </div>
+                <div class="world-thumb" onclick="changeWorldImage('https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EB%A3%A8%EB%82%98%EB%94%94%EB%B9%84%EC%A0%8402.png', '루나 디비전 본부', this)">
+                    <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EB%A3%A8%EB%82%98%EB%94%94%EB%B9%84%EC%A0%8402.png" alt="루나 디비전 본부">
+                </div>
+                <div class="world-thumb" onclick="changeWorldImage('https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EB%B8%8C%EB%A6%AC%ED%95%91%EB%A3%B8.png', '루나 디비전 브리핑 룸', this)">
+                    <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EB%B8%8C%EB%A6%AC%ED%95%91%EB%A3%B8.png" alt="루나 디비전 브리핑 룸">
+                </div>
+                <div class="world-thumb" onclick="changeWorldImage('https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EA%B5%90%EC%8B%A401.png', '루미나 고등학교 교실', this)">
+                    <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EA%B5%90%EC%8B%A401.png" alt="루미나 고등학교 교실">
+                </div>
+                <div class="world-thumb" onclick="changeWorldImage('https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EC%8B%9C%EB%82%B401.png', '번화가', this)">
+                    <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EC%8B%9C%EB%82%B401.png" alt="번화가">
+                </div>
+                <div class="world-thumb" onclick="changeWorldImage('https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EC%A7%80%ED%95%98%EC%B2%A0%EC%97%AD.png', '지하철 역', this)">
+                    <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EC%A7%80%ED%95%98%EC%B2%A0%EC%97%AD.png" alt="지하철 역">
+                </div>
+                <div class="world-thumb" onclick="changeWorldImage('https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EC%A7%80%ED%95%98%EC%B2%A0%20%EB%82%B4%EB%B6%80.png', '지하철 내부', this)">
+                    <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EC%A7%80%ED%95%98%EC%B2%A0%20%EB%82%B4%EB%B6%80.png" alt="지하철 내부">
+                </div>
+                <div class="world-thumb" onclick="changeWorldImage('https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EA%B3%B5%EC%9B%90.png', '공원', this)">
+                    <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EA%B3%B5%EC%9B%90.png" alt="공원">
+                </div>
+                <div class="world-thumb" onclick="changeWorldImage('https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EA%B3%A8%EB%AA%A901.png', '낮 골목', this)">
+                    <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EA%B3%A8%EB%AA%A901.png" alt="낮 골목">
+                </div>
+                <div class="world-thumb" onclick="changeWorldImage('https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EB%B0%A4%EA%B3%A8%EB%AA%A901.png', '밤 골목', this)">
+                    <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EB%B0%A4%EA%B3%A8%EB%AA%A901.png" alt="밤 골목">
+                </div>
+                <div class="world-thumb" onclick="changeWorldImage('https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EB%B0%A4%EA%B1%B0%EB%A6%AC01.png', '밤거리', this)">
+                    <img src="https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EB%B0%A4%EA%B1%B0%EB%A6%AC01.png" alt="밤거리">
+                </div>
+            </div>
+        </div>
+        
+        <div class="world-text reveal">
+            <p class="prologue-body">인구 800만의 거대 도시 루미나시티. 낮에는 화려한 불빛 아래 평범한 일상이 흐르지만, 해가 지면 사람들의 억눌린 분노, 슬픔, 시기심이 실체화되어 '쉐도우'라는 괴물을 만들어낸다.<br><br>오직 '감정 공명자'만이 그 쉐도우를 마주하며 정화해나간다.</p>
+            <div class="keyword-list">
+                <div class="keyword-item">
+                    <div class="keyword-tag">System</div>
+                    <div class="keyword-body">
+                        <h4>마법소녀 시스템</h4>
+                        <p>1만 명 중 1명꼴인 '감정 공명 체질'. 이 체질을 가진 자만이 변신 가능. 남성 공명자는 변신 시 신체가 여성형으로 완전 변환.</p>
+                    </div>
+                </div>
+                <div class="keyword-item">
+                    <div class="keyword-tag">Org</div>
+                    <div class="keyword-body">
+                        <h4>루나 디비전</h4>
+                        <p>초자연현상 대응 특수부서. 감시팀 / 지원팀 / 연구팀 / 커버팀으로 구성된 비밀 기관.</p>
+                    </div>
+                </div>
+                <div class="keyword-item">
+                    <div class="keyword-tag">Risk</div>
+                    <div class="keyword-body">
+                        <h4>정화의 대가</h4>
+                        <p>쉐도우 정화 시 부정적 감정을 흡수. 내면에 쌓이면 감각을 잃거나 스스로 쉐도우가 될 위험.</p>
+                    </div>
+                </div>
+                <div class="keyword-item">
+                    <div class="keyword-tag">Threat</div>
+                    <div class="keyword-body">
+                        <h4>쉐도우</h4>
+                        <p>강한 부정적 감정이 물질화된 존재. 내부 '코어' 파괴 필요. 방치 시 전염됨.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="characters">
+    <div class="section-header reveal">
+        <div class="section-label">Cast</div>
+        <h2 class="section-title">Characters</h2>
+        <div class="section-number">02 /</div>
+    </div>
+    <div class="char-grid" id="charGrid"></div>
+</section>
+
+<section id="test">
+    <div class="section-header reveal">
+        <div class="section-label">Adaptability</div>
+        <h2 class="section-title">Resonance Test</h2>
+        <div class="section-number">03 /</div>
+    </div>
+    <div class="test-layout">
+        <div class="test-aside reveal">
+            <strong>Classification</strong>
+            당신의 감정 공명 유형을 진단합니다. 직관에 따라 답하십시오.
+        </div>
+        <div class="test-box reveal">
+            <div class="test-progress">
+                <span id="progress-label">Q1 / 5</span>
+                <div class="progress-bar-wrap">
+                    <div class="progress-bar-fill" id="progressFill" style="width:20%"></div>
+                </div>
+                <span id="progress-status">진행 중</span>
+            </div>
+            <div id="question-display">
+                <div id="question-text" class="question-text"></div>
+                <div id="answer-list" class="answer-list"></div>
+            </div>
+            <div id="result-display">
+                <div class="result-label">공명 분석 완료</div>
+                <div class="result-code" id="result-code"></div>
+                <div class="result-name" id="result-name"></div>
+                <div class="result-desc" id="result-desc"></div>
+                <button class="retry-btn" onclick="resetTest()">Retry Analysis</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div id="charModal" class="modal">
+    <button class="modal-close" onclick="closeModal()">[ Close × ]</button>
+    <div class="modal-inner" id="modalContent"></div>
+</div>
+
+<footer>
+    <div class="footer-logo">Luna Division</div>
+    <div class="footer-copy">
+        <div style="color:var(--neon); letter-spacing:0.1em;">We watch the dark to keep the light.</div>
+        <div>© 2026 LUNA DIVISION. All records classified.</div>
+    </div>
+</footer>
+
+<script>
+    /* ── Rain Effect ── */
+    const rainCanvas = document.getElementById('rainCanvas');
+    const rainCtx = rainCanvas.getContext('2d');
+    let drops = [];
+    let numberOfDrops = 200;
+
+    class Drop {
+        constructor() {
+            this.init();
+        }
+
+        init() {
+            this.x = Math.random() * rainCanvas.width;
+            this.y = Math.random() * -rainCanvas.height;
+            this.vy = Math.random() * 5 + 10;
+            this.l = Math.random() * 20 + 10;
+        }
+
+        update() {
+            this.y += this.vy;
+            if (this.y > rainCanvas.height) {
+                this.init();
+            }
+        }
+
+        draw() {
+            rainCtx.beginPath();
+            rainCtx.strokeStyle = 'rgba(174, 194, 224, 0.15)';
+            rainCtx.lineWidth = 1;
+            rainCtx.moveTo(this.x, this.y);
+            rainCtx.lineTo(this.x, this.y + this.l);
+            rainCtx.stroke();
+        }
+    }
+
+    function initRain() {
+        rainCanvas.width = window.innerWidth;
+        rainCanvas.height = window.innerHeight;
+        drops = [];
+        for (let i = 0; i < numberOfDrops; i++) {
+            drops.push(new Drop());
+        }
+    }
+
+    function animateRain() {
+        rainCtx.clearRect(0, 0, rainCanvas.width, rainCanvas.height);
+        for (let i = 0; i < drops.length; i++) {
+            drops[i].update();
+            drops[i].draw();
+        }
+        requestAnimationFrame(animateRain);
+    }
+
+    window.addEventListener('load', () => {
+        initRain();
+        animateRain();
+    });
+
+    window.addEventListener('resize', initRain);
+
+    /* ── Cursor ── */
+    const dot = document.getElementById('cursorDot');
+    const ring = document.getElementById('cursorRing');
+    document.addEventListener('mousemove', e => {
+        dot.style.left = e.clientX + 'px';
+        dot.style.top = e.clientY + 'px';
+        ring.style.left = e.clientX + 'px';
+        ring.style.top = e.clientY + 'px';
+    });
+    document.querySelectorAll('a, button, .char-card, .answer-btn, [onclick]').forEach(el => {
+        el.addEventListener('mouseenter', () => ring.classList.add('expanded'));
+        el.addEventListener('mouseleave', () => ring.classList.remove('expanded'));
+    });
+
+    /* ── BGM ── */
+    const bgm = document.getElementById('bgm-audio');
+    const playBtn = document.getElementById('play-btn');
+    bgm.volume = 0.5;
+
+    document.body.addEventListener('click', () => {
+        if (bgm.paused) playMusic();
+    }, { once: true });
+
+    function playMusic() {
+        bgm.play().then(() => {
+            playBtn.textContent = '■';
+            playBtn.classList.add('playing');
+        }).catch(() => {});
+    }
+
+    function toggleMusic() {
+        if (bgm.paused) { playMusic(); }
+        else { bgm.pause(); playBtn.textContent = '▶'; playBtn.classList.remove('playing'); }
+    }
+
+    function changeVolume(val) { bgm.volume = val; }
+
+    /* ── Scroll Reveal ── */
+    const observer = new IntersectionObserver(entries => {
+        entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+    }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    /* ── Character Data ── */
+    const characters = [
+        { name: "서은채", code: "LUMEN", age: "18세", role: "2학년", ability: "방어막 생성, 빛의 창", resonance: "희망과 신뢰에 공명", quote: "괜찮아, 내가 할게. 걱정하지 마.", img: "https://raw.githubusercontent.com/deokc/LUNA/refs/heads/main/%EC%84%9C%EC%9D%80%EC%B1%8401.png", transImg: "https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%EB%A3%A9%EB%A9%98.png", power: 72, clarity: 88, contamination: 15 },
+        { name: "한지민", code: "DIRECTOR", age: "45세", role: "루나 디비전 국장", ability: "정치력, 지휘 통제", resonance: "냉철한 판단력 뒤에 죄책감을 숨기고 있다.", quote: "출동해. 15분 안에.", img: "https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%ED%95%9C%EC%A7%80%EB%AF%BC.png", transImg: "https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%ED%95%9C%EC%A7%80%EB%AF%BC2.png", power: 60, clarity: 95, contamination: 48 },
+        { name: "이도윤", code: "ATON", age: "19세", role: "3학년", ability: "리와인드 (시간 되감기)", resonance: "자기혐오와 죄책감에 공명", quote: "음... 네가 하고 싶은 대로...", img: "https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%EC%9D%B4%EB%8F%84%EC%9C%A4.png", transImg: "https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%EC%95%84%ED%86%A4.png", power: 85, clarity: 55, contamination: 62 },
+        { name: "김세라", code: "STELLA", age: "17세", role: "1학년", ability: "순간이동, 환상술", resonance: "동경과 인정에 공명", quote: "언니~! 저도 같이 가면 안 돼요?", img: "https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%EA%B9%80%EC%84%B8%EB%9D%BC.png", transImg: "https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%EC%8A%A4%ED%85%94%EB%9D%BC.png", power: 58, clarity: 70, contamination: 22 },
+        { name: "사토 유키", code: "NOCTIS", age: "18세", role: "2학년", ability: "카타나 공격 및 속박", resonance: "공포와 의심에 공명", quote: "효율적이지 않네요.", img: "https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%EC%82%AC%ED%86%A0%20%EC%9C%A0%ED%82%A4.png", transImg: "https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%EB%85%B8%ED%81%AC%ED%8B%B0%EC%8A%A4.png", power: 91, clarity: 78, contamination: 35 },
+        { name: "강민지", code: "FLARE", age: "19세", role: "3학년", ability: "고화력 공격, 파괴 특화", resonance: "분노와 좌절에 공명", quote: "또 이거야? 왜 나만 이래야 돼?", img: "https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%EA%B0%95%EB%AF%BC%EC%A7%80.png", transImg: "https://raw.githubusercontent.com/deokc/basic/refs/heads/main/%ED%94%8C%EB%A0%88%EC%96%B4.png", power: 98, clarity: 42, contamination: 77 }
+    ];
+
+    /* Build character grid */
+    const grid = document.getElementById('charGrid');
+    characters.forEach((char, i) => {
+        const card = document.createElement('div');
+        card.className = 'char-card reveal';
+        card.innerHTML = `
+            <img src="${char.img}" alt="${char.name}">
+            <div class="char-overlay">
+                <div class="char-code">${char.code}</div>
+                <div class="char-name">${char.name}</div>
+                <div class="char-role">${char.role}</div>
+                <div class="char-view-btn">View Profile →</div>
+            </div>
+            <div class="char-hover-bar"></div>
+        `;
+        card.addEventListener('click', () => openModal(i));
+        card.addEventListener('mouseenter', () => ring.classList.add('expanded'));
+        card.addEventListener('mouseleave', () => ring.classList.remove('expanded'));
+        grid.appendChild(card);
+        observer.observe(card);
+    });
+
+    /* Modal */
+    let isTransformed = false;
+
+    function openModal(index) {
+        const c = characters[index];
+        isTransformed = false;
+        const modal = document.getElementById('charModal');
+        document.getElementById('modalContent').innerHTML = `
+            <div class="modal-img-wrap">
+                <div class="modal-img-frame">
+                    <img id="modalImg" src="${c.img}" alt="${c.name}">
+                </div>
+                <button class="modal-form-btn" onclick="toggleForm(${index})">
+                    Form Change — 변신폼 확인
+                </button>
+            </div>
+            <div class="modal-info">
+                <div class="modal-tag">${c.role}</div>
+                <div class="modal-name">${c.name}</div>
+                <div class="modal-code">[ ${c.code} ]</div>
+                <div class="modal-meta">
+                    <div class="modal-meta-row">
+                        <span class="modal-meta-key">Age</span>
+                        <span class="modal-meta-val">${c.age}</span>
+                    </div>
+                    <div class="modal-meta-row">
+                        <span class="modal-meta-key">Ability</span>
+                        <span class="modal-meta-val">${c.ability}</span>
+                    </div>
+                    <div class="modal-meta-row">
+                        <span class="modal-meta-key">Resonance</span>
+                        <span class="modal-meta-val">${c.resonance}</span>
+                    </div>
+                </div>
+                <div class="modal-quote">${c.quote}</div>
+                <div class="modal-status">
+                    <div class="modal-status-title">Resonance Monitor — Live</div>
+                    <div class="status-bar">
+                        <div class="status-row">
+                            <span class="status-label">Power</span>
+                            <div class="status-track"><div class="status-fill" style="width:${c.power}%"></div></div>
+                            <span class="modal-meta-key" style="width:30px;text-align:right">${c.power}</span>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-label">Clarity</span>
+                            <div class="status-track"><div class="status-fill" style="width:${c.clarity}%"></div></div>
+                            <span class="modal-meta-key" style="width:30px;text-align:right">${c.clarity}</span>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-label">Contamination</span>
+                            <div class="status-track">
+                                <div class="status-fill" style="width:${c.contamination}%; background:${c.contamination > 60 ? '#ff4444' : c.contamination > 40 ? '#ff8844' : 'var(--neon)'}"></div>
+                            </div>
+                            <span class="modal-meta-key" style="width:30px;text-align:right">${c.contamination}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function toggleForm(index) {
+        const c = characters[index];
+        const img = document.getElementById('modalImg');
+        img.style.opacity = '0';
+        setTimeout(() => {
+            img.src = isTransformed ? c.img : c.transImg;
+            img.style.opacity = '1';
+            isTransformed = !isTransformed;
+        }, 250);
+    }
+
+    function closeModal() {
+        document.getElementById('charModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+
+    window.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+    document.getElementById('charModal').addEventListener('click', e => {
+        if (e.target === document.getElementById('charModal')) closeModal();
+    });
+
+    /* ── Test ── */
+    const questions = [
+        {
+            q: "어두운 골목에서 쉐도우와 마주쳤습니다. 당신의 반응은?",
+            a: [
+                { text: "도망치거나 물러서는 대신, 눈앞의 위협에 단호하게 맞선다.", score: "VALOR" },
+                { text: "나에게 다가오는 그림자의 깊이와 그 근원적인 슬픔을 조용히 관찰한다.", score: "ECHO" },
+                { text: "주변에 다친 사람이나 도움을 필요로 하는 이가 없는지 먼저 살핀다.", score: "NEXUS" },
+                { text: "예측 불가능한 알 수 없는 파동이 온몸을 휘감는 것을 느끼며 미소 짓는다.", score: "CHAOS" }
+            ]
+        },
+        {
+            q: "당신이 변신을 위해 소모하는 '가장 깊은 내면의 감정'은 무엇입니까?",
+            a: [
+                { text: "현실의 장벽을 부수고 나아가려는 한계 없는 '투지'", score: "VALOR" },
+                { text: "도시의 소음 속에 홀로 남겨진 듯한 묵직한 '쓸쓸함'", score: "ECHO" },
+                { text: "타인의 슬픔과 상처에 깊이 동조하고 아파하는 '공감'", score: "NEXUS" },
+                { text: "기존의 모든 제약과 규칙을 깨부수고 싶어 하는 '충동'", score: "CHAOS" }
+            ]
+        },
+        {
+            q: "전투가 끝난 후, 내면에 쌓인 오염도를 정화하는 당신만의 방식은?",
+            a: [
+                { text: "한계를 시험하는 혹혹한 훈련을 거치며 감정을 비워낸다.", score: "VALOR" },
+                { text: "고요히 가라앉은 어둠 속에 혼자 머물며 마음을 다스린다.", score: "ECHO" },
+                { text: "신뢰하는 이들의 온기를 느끼거나 깊은 대화를 나누며 위로받는다.", score: "NEXUS" },
+                { text: "정처 없이 밤거리를 방황하거나 자극적인 충격에 몰두한다.", score: "CHAOS" }
+            ]
+        },
+        {
+            q: "당신이 생각하는 '루미나 시티'의 본질은 무엇인가요?",
+            a: [
+                { text: "우리가 매일 극복하고 더 나은 곳으로 증명해 가야 할 전장.", score: "VALOR" },
+                { text: "화려한 네온사인 뒤에 숨겨진 무수한 영혼들의 차가운 소외지.", score: "ECHO" },
+                { text: "수많은 사람들의 평범한 행복과 온기가 지켜져야 할 보금자리.", score: "NEXUS" },
+                { text: "언제 터질지 모르는 억압된 욕망이 가득 찬 찬란한 화약고.", score: "CHAOS" }
+            ]
+        },
+        {
+            q: "만약 당신이 쉐도우에게 서서히 잠식되어가는 절체절명의 위기에 처한다면?",
+            a: [
+                { text: "마지막 남은 자아까지 쥐어짜 내 끝까지 그림자를 찍어 누른다.", score: "VALOR" },
+                { text: "운명을 조용히 받아들이며 어둠 속에 나만의 깊은 흔적을 남긴다.", score: "ECHO" },
+                { text: "남겨질 사람들에게 해가 되지 않도록 나를 격리하거나 희생한다.", score: "NEXUS" },
+                { text: "잠식마저 내 힘으로 삼아 통제 불가능한 파괴적인 괴물이 되어서라도 날뛴다.", score: "CHAOS" }
+            ]
+        }
+    ];
+
+    let currentQ = 0;
+    let scores = {};
+
+    function resetScores() {
+        scores = { VALOR: 0, ECHO: 0, NEXUS: 0, CHAOS: 0 };
+    }
+
+    function loadQuestion() {
+        const q = questions[currentQ];
+        document.getElementById('question-text').textContent = q.q;
+        document.getElementById('progress-label').textContent = `Q${currentQ + 1} / ${questions.length}`;
+        document.getElementById('progressFill').style.width = `${((currentQ + 1) / questions.length) * 100}%`;
+        const list = document.getElementById('answer-list');
+        list.innerHTML = '';
+        q.a.forEach(ans => {
+            const btn = document.createElement('button');
+            btn.className = 'answer-btn';
+            btn.textContent = ans.text;
+            btn.onclick = () => selectAnswer(ans.score);
+            list.appendChild(btn);
+        });
+    }
+
+    function selectAnswer(score) {
+        scores[score] = (scores[score] || 0) + 1;
+        currentQ++;
+        if (currentQ < questions.length) {
+            loadQuestion();
+        } else {
+            showResult();
+        }
+    }
+
+    function showResult() {
+        document.getElementById('question-display').style.display = 'none';
+        document.getElementById('progress-status').textContent = '완료';
+        document.getElementById('progressFill').style.width = '100%';
+        const rd = document.getElementById('result-display');
+        rd.style.display = 'block';
+        
+        let max = 0, type = 'VALOR';
+        for (let t in scores) { if (scores[t] > max) { max = scores[t]; type = t; } }
+        
+        const resonanceMap = {
+            VALOR: {
+                wave: "WAVE TYPE: <em>VALOR</em>",
+                title: "— 당신의 감정 공명: [ 불굴의 투지와 오버컴 ]",
+                desc: "당신의 영혼은 그 어떤 절망과 공포 앞에서도 끝내 무릎 꿇지 않는 강력한 의지를 자아냅니다. 위기 상황 속에서 더욱 예리하고 단단하게 다듬어지는 당신의 투지는 주위의 모든 부정적 파동을 단숨에 찍어 누르고 분쇄하는 거대한 파괴력을 지니고 있습니다."
+            },
+            ECHO: {
+                wave: "WAVE TYPE: <em>ECHO</em>",
+                title: "— 당신의 감정 공명: [ 고독과 공허의 심연 잔향 ]",
+                desc: "당신은 도시의 번잡한 소음 속에서도 깊은 침묵을 유지할 줄 아는 섬세하고 깊은 영혼의 소유자입니다. 내면에 가라앉은 특유의 차분한 쓸쓸함과 슬픔의 파동은, 역설적으로 거칠게 폭주하는 쉐도우의 오염 에너지를 무력화하고 영점으로 되돌려 정화하는 독보적인 정적 능력을 보여줍니다."
+            },
+            NEXUS: {
+                wave: "WAVE TYPE: <em>NEXUS</em>",
+                title: "— 당신의 감정 공명: [ 절대적 수호와 유대 결속 ]",
+                desc: "타인의 고통을 자신의 상처처럼 고스란히 느끼고, 상처받은 세계를 치유하고자 하는 강한 연대감이 당신의 힘의 근원입니다. 주변 사람들의 감정적 파동을 하나로 결속시키고, 그들의 잠재력을 극한까지 증폭시키는 성스럽고 자비로운 성질의 공명 파형입니다."
+            },
+            CHAOS: {
+                wave: "WAVE TYPE: <em>CHAOS</em>",
+                title: "— 당신의 감정 공명: [ 정제되지 않은 해방과 혼돈 ]",
+                desc: "기존의 정형화된 틀이나 억압적인 규칙에 얽매이지 않는, 본능적인 자유에 대한 열망이 당신의 파동입니다. 언제 어떤 방향으로 튈지 모르는 야생적인 감정 에너지는 통제하기 극히 까다롭지만, 한 번 해방되면 전장의 판도 자체를 완벽하게 뒤흔들어버리는 예측 불가능한 거대한 잠재력을 자아냅니다."
+            }
+        };
+
+        const resultData = resonanceMap[type] || resonanceMap['VALOR'];
+        
+        document.getElementById('result-code').innerHTML = resultData.wave;
+        document.getElementById('result-name').textContent = resultData.title;
+        document.getElementById('result-desc').innerHTML = resultData.desc + `<br><br><span style="color:#444; font-size:0.65rem; font-family:var(--font-mono); display:block; border-top:1px dashed #222; padding-top:16px;">[ SYSTEM LOG: 분석된 독자적 감정 데이터가 루나 디비전 메인 서버에 동기화 완료되었습니다. ]</span>`;
+    }
+
+    function resetTest() {
+        currentQ = 0;
+        resetScores();
+        document.getElementById('question-display').style.display = 'block';
+        document.getElementById('result-display').style.display = 'none';
+        document.getElementById('progress-status').textContent = '진행 중';
+        loadQuestion();
+    }
+
+    /* ── World View 배경 이미지 교체 ── */
+    function changeWorldImage(imgSrc, labelText, thumbEl) {
+        const mainImg = document.getElementById('worldMainImg');
+        const label = document.getElementById('worldImgLabel');
+        if (!mainImg || !label) return;
+
+        mainImg.style.opacity = '0';
+        setTimeout(() => {
+            mainImg.src = imgSrc;
+            label.textContent = labelText;
+            mainImg.style.opacity = '1';
+        }, 200);
+
+        document.querySelectorAll('.world-thumb').forEach(thumb => {
+            thumb.classList.remove('active');
+        });
+        thumbEl.classList.add('active');
+    }
+
+    /* ── Intro Script ── */
+    const introLines = [
+        "사람들은 말하지. 화려한 도시 아래 세상이 눈부시게 발전했다고.",
+        "하지만 빛이 강해질수록, 그 뒤에 드리워진 그림자는 더 깊어질 뿐이야.",
+        "인간의 억눌린 분노, 슬픔, 시기심... 밤이 되면 그 절망들은 도시를 잠식해.",
+        "그리고 누군가는... 자신의 평범한 일상과 인생을 깎아 변신해 그 어둠에 맞서지.",
+        "마법소녀. 그 잔혹하고 찬란한 세상 속으로."
+    ];
+    let currentIntroIdx = 0;
+    const introOverlay = document.getElementById('intro-overlay');
+    const introTextEl = document.getElementById('intro-text');
+    const introBtnEl = document.getElementById('intro-btn');
+
+    function showIntroLine() {
+        introTextEl.classList.remove('active');
+        setTimeout(() => {
+            introTextEl.textContent = introLines[currentIntroIdx];
+            introTextEl.classList.add('active');
+            if (currentIntroIdx === introLines.length - 1) {
+                introBtnEl.textContent = "ENTER →";
+            }
+        }, 500);
+    }
+
+    function nextIntro() {
+        if (typeof playMusic === 'function') { playMusic(); }
+        currentIntroIdx++;
+        if (currentIntroIdx < introLines.length) {
+            showIntroLine();
+        } else {
+            /* [수정부] 마지막 ENTER 클릭 시 글자와 버튼이 먼저 블러 및 페이드아웃 처리되며 사라락 사라짐 */
+            introTextEl.classList.remove('active');
+            introBtnEl.style.opacity = '0';
+            introBtnEl.style.pointerEvents = 'none';
+            
+            // 글자 연출이 끝난 타이밍(0.5초 후)에 맞춰 배경 장막이 걷히며 본 사이트 표시
+            setTimeout(() => {
+                introOverlay.style.opacity = '0';
+                document.body.classList.remove('intro-active');
+                setTimeout(() => {
+                    introOverlay.style.display = 'none';
+                }, 1200);
+            }, 500);
+        }
+    }
+
+    if(introTextEl) {
+        introTextEl.textContent = introLines[0];
+        introTextEl.classList.add('active');
+    }
+
+    resetScores();
+    loadQuestion();
+</script>
+</body>
+</html>
